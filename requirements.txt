@@ -1,0 +1,10 @@
+gymnasium
+matplotlib
+mesa
+numpy
+pandas
+pettingzoo
+solara
+networkx
+altair
+
