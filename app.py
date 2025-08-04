@@ -1,7 +1,7 @@
 import solara
 from mesa.visualization import SolaraViz, make_space_component, Slider
 from model import WarehouseModel
-from agents import Robot, Package, Obstacle, Pheromones
+from agents import Robot, Package, Obstacle, Pheromones, QLearning
 
 
 def agent_portrayal(agent):
@@ -15,9 +15,14 @@ def agent_portrayal(agent):
         portrayal["zorder"] = 2
 
     elif isinstance(agent, Package):
-        portrayal["color"] = "green"
-        portrayal["marker"] = "o"
-        portrayal["zorder"] = 2
+        if(agent.delivered):
+            portrayal["color"] = "blue"
+            portrayal["marker"] = "o"
+            portrayal["zorder"] = 2
+        else:
+            portrayal["color"] = "green"
+            portrayal["marker"] = "o"
+            portrayal["zorder"] = 2
 
 
     elif isinstance(agent, Obstacle):
@@ -49,7 +54,16 @@ def agent_portrayal(agent):
 
 
 
+q_learning_params = {
+        "actions": [0, 1, 2, 3, 4, 5],
+        "alpha": 0.01,
+        "gamma": 0.99,
+        "epsilon": 0.5,
+        "epsilon_decay": 0.9985,
+        "min_epsilon": 0.01
+    }
 
+q = QLearning(**q_learning_params, q_table_file="q_table_avg.json")
 
 model_params = {
 
@@ -60,14 +74,16 @@ model_params = {
         "label": "Render Pheromone?",
     },
 
-    "height": Slider("Height", 15, 5, 100, 5, dtype=int),
-    "width": Slider("Width", 15, 5, 100, 5, dtype=int),
-    "num_robot": Slider("Number of robots", 2, 1, 5, 1, dtype=int),
-    "num_package": Slider("Number of packages", 3, 1, 20, 1, dtype=int),
-    "num_obstacle": Slider("Number of obstacles", 4, 1, 20, 1, dtype=int),
+    "height": Slider("Height", 20, 5, 100, 5, dtype=int),
+    "width": Slider("Width", 20, 5, 100, 5, dtype=int),
+    "num_robot": Slider("Number of robots", 3, 1, 10, 1, dtype=int),
+    "num_package": Slider("Number of packages", 10, 1, 20, 1, dtype=int),
+    "num_obstacle": Slider("Number of obstacles", 128, 1, 200, 1, dtype=int),
     "pheromone_evaporation": Slider("Pheromone Evaporation", 0.1, 0, 1, 0.01, dtype=float),
     "pheromone_added": Slider("Pheromone Released", 1, 0, 5, 0.1, dtype=float),
     "diffusion_rate": Slider("Diffusion Rate", 0.5, 0.01, 1, 0.1, dtype=float),
+
+    "q_learning": q
 
 }
 

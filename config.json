@@ -1,0 +1,14 @@
+{
+  "width": 10,
+  "height": 10,
+  "num_robot": 2,
+  "num_package": 3,
+  "num_obstacle": 4,
+  "pheromone_added": 1,
+  "pheromone_evaporation": 0.1,
+  "diffusion_rate": 0.5,
+  "treshold": 0.0000001,
+  "max_steps": 200,
+  "max_weight": 2
+
+}
