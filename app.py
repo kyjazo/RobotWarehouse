@@ -3,6 +3,7 @@ from mesa.visualization import SolaraViz, make_space_component, Slider
 from model import WarehouseModel
 from agents import Robot, Package, Obstacle, Pheromones, QLearning
 
+treshold = 0.001
 
 def agent_portrayal(agent):
     portrayal = {
@@ -32,7 +33,7 @@ def agent_portrayal(agent):
 
     elif isinstance(agent, Pheromones):
 
-       if agent.pheromone.robot_pheromone == 0 and agent.pheromone.package_pheromone == 0:
+       if agent.pheromone.robot_pheromone <= treshold and agent.pheromone.package_pheromone <= treshold:
            portrayal["color"] = "white"
            portrayal["marker"] = "s"
            portrayal["size"] = 75
@@ -55,7 +56,7 @@ def agent_portrayal(agent):
 
 
 q_learning_params = {
-        "actions": [0, 1, 2, 3, 4, 5],
+        "actions": [0, 1, 2, 3],
         "alpha": 0.01,
         "gamma": 0.99,
         "epsilon": 0.5,
@@ -76,11 +77,11 @@ model_params = {
 
     "height": Slider("Height", 20, 5, 100, 5, dtype=int),
     "width": Slider("Width", 20, 5, 100, 5, dtype=int),
-    "num_robot": Slider("Number of robots", 3, 1, 10, 1, dtype=int),
+    "num_robot": Slider("Number of robots", 5, 1, 10, 1, dtype=int),
     "num_package": Slider("Number of packages", 10, 1, 20, 1, dtype=int),
     "num_obstacle": Slider("Number of obstacles", 128, 1, 200, 1, dtype=int),
     "pheromone_evaporation": Slider("Pheromone Evaporation", 0.1, 0, 1, 0.01, dtype=float),
-    "pheromone_added": Slider("Pheromone Released", 1, 0, 5, 0.1, dtype=float),
+    "pheromone_added": Slider("Pheromone Released", 1, 0, 10, 0.1, dtype=float),
     "diffusion_rate": Slider("Diffusion Rate", 0.5, 0.01, 1, 0.1, dtype=float),
 
     "q_learning": q

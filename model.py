@@ -88,7 +88,7 @@ class WarehouseModel(Model):
     def place_agents(self, agent_class, num_agents):
 
         if agent_class.__name__ == "Robot":
-            agents = agent_class.create_agents(model=self, n=num_agents)
+            agents = agent_class.create_agents(model=self, n=num_agents, q_learning=self.q_learning)
             positions = []
             while len(positions) < num_agents:
                 x = self.random.randint(0, self.grid.width - 1)
@@ -118,20 +118,20 @@ class WarehouseModel(Model):
                 (8, 8), (8, 9), (9, 8), (9, 9),
                 (14, 14), (14, 15), (15, 14), (15, 15),
                 (18, 2), (18, 3), (19, 2), (19, 3),
-#
+##
                 # Blocchi 1x3 orizzontali
                 (2, 10), (2, 11), (2, 12),
                 (10, 18), (10, 19),
-#
+##
                 # Blocchi 1x3 verticali
                 (12, 2), (13, 2), (14, 2),
                 (6, 16), (7, 16), (8, 16),
-#
+##
                 # Blocchi a L
                 (5, 15), (5, 16), (6, 15),  # L in alto a destra
                 (15, 5), (16, 5), (15, 6),  # L in basso a sinistra
                 (11, 11), (11, 12), (12, 11),  # L centrale
-#
+##
                 # Ostacoli sparsi per raggiungere il 30%
                 (1, 1), (1, 18), (18, 1), (18, 18),  # Angoli
                 (7, 3), (7, 4), (12, 17), (13, 17),
@@ -251,11 +251,11 @@ class WarehouseModel(Model):
     def check_packages(self):
         for agent in self.agents:
             if isinstance(agent, Package):
-                if agent.pos != agent.destination:
+                if not agent.delivered:
                     return False
         return True
 
-    def get_closest_package_distance(self, pos, radius=6):
+    def get_closest_package_distance(self, pos, radius=5):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         package = [agent for agent in neighbors if isinstance(agent, Package) and not agent.collected]
@@ -264,6 +264,15 @@ class WarehouseModel(Model):
             return radius + 1
 
         return min(self.get_distance(pos, s.pos) for s in package)
+    def get_closest_robot_distance(self, pos, radius=5):
+
+        neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
+        robot = [agent for agent in neighbors if isinstance(agent, Robot)]
+
+        if not robot:
+            return radius + 1
+
+        return min(self.get_distance(pos, s.pos) for s in robot)
 
     def get_distance(self, pos1, pos2):
 
@@ -309,6 +318,7 @@ class WarehouseModel(Model):
             #for agent in self.agents:
             #    if isinstance(agent, Robot):
             #        print("Numero di package delivered: ", agent.package_delivered)
+            #print("Epsilon: ", self.q_learning.epsilon)
             self.running = False
             self.datacollector.collect(self)
             self.decay_epsilon()

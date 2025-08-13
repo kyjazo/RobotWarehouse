@@ -320,16 +320,18 @@ if __name__ == "__main__":
 
     num_parallel_runs = 3
 
+
     base_params = {
-        "width": 45,
-        "height": 45,
-        "num_robot": 10,
+        "width": 20,
+        "height": 20,
+        "num_robot": 5,
         "num_package": 20,
         "learning": True,
         "max_steps": 200,
         "diffusion_rate": 0.5,
         "pheromone_evaporation": 0.1,
         "testing": False,
+        "max_weight": 3,
         "q_table_file": "",
     }
 
@@ -382,11 +384,11 @@ if __name__ == "__main__":
             clean_up_q_tables(q_tables_paths, keep_file="q_table_avg.json")
 
         df = pd.DataFrame(all_results)
-        print(all_results)
+        #print(all_results)
         df = df.dropna(subset=['Reward'])
 
 
-        print(all_results)
+        #print(all_results)
 
 
         output_dir, abs_output_dir = get_next_test_folder(base_params['testing'], base_params['learning'])

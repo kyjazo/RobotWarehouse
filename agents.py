@@ -138,6 +138,7 @@ class Robot(Agent):
         self.q_learning = q_learning
         self.action_counts = {0: 0, 1: 0, 2: 0, 3: 0}
         self.package_delivered = 0
+        self.previous_pos = self.pos
 
         if self.q_learning != None:
 
@@ -147,9 +148,11 @@ class Robot(Agent):
             self.q_learning = QLearning()
             #self.q_learning.load_q_table(model.q_table_file)
 
+        #print(self.q_learning.epsilon)
         self.rewards = []
         self.last_package_distance = float('inf')
-        self.last_goal_distance = float('inf') #quando raccolgo il package uso la posizione goal per calcolare reward
+        self.last_robot_distance = float('inf')
+
         self.picked_package = False
         self.use_learning = self.model.learning
         self.shared_reward = 0
@@ -201,6 +204,10 @@ class Robot(Agent):
         base_reward += self.shared_reward
         self.shared_reward = 0
 
+        if self.previous_pos == self.pos:
+            #print("Penalità per essere rimasto fermo")
+            base_reward -= 1
+
         if self.picked_package:
             #print("ho raccolto un package allo step:", self.model.steps)
 
@@ -208,36 +215,39 @@ class Robot(Agent):
 
 
             self.last_package_distance = self.model.get_closest_package_distance(self.pos)
-            self.last_goal_distance = self.model.get_distance(self.pos, self.target_location)
+            #self.last_goal_distance = self.model.get_distance(self.pos, self.target_location)
             self.picked_package = False
             #print("reward per aver raccolto un pacco", base_reward)
             return base_reward
 
-        if self.carrying_package:
-            current_dist = self.model.get_distance(self.pos, self.target_location)
 
-            if hasattr(self, 'last_goal_distance') and self.model.steps > 0:
-                dist_change = self.last_goal_distance - current_dist
+        current_dist = self.model.get_closest_package_distance(self.pos)
+        #print("Last distance: ", self.last_package_distance)
+        #print("Current distance: ", current_dist)
+        if hasattr(self, 'last_package_distance') and self.model.steps > 0:
+            dist_change = self.last_package_distance - current_dist
 
-                distance_reward = dist_change  # * 2
-                base_reward += distance_reward
+            distance_reward = dist_change  # * 2
+            base_reward += distance_reward
+            #print("Reward per avvicinamento package: ", distance_reward)
 
-            self.last_goal_distance = current_dist
-            print("Non dovrebbe entrare qui")
-            return base_reward
-        else:
-            current_dist = self.model.get_closest_package_distance(self.pos)
-            #print("Last distance: ", self.last_package_distance)
-            #print("Current distance: ", current_dist)
-            if hasattr(self, 'last_package_distance') and self.model.steps > 0:
-                dist_change = self.last_package_distance - current_dist
+        self.last_package_distance = current_dist
 
-                distance_reward = dist_change  # * 2
-                base_reward += distance_reward
+        current_dist = self.model.get_closest_robot_distance(self.pos)
+        # print("Last distance: ", self.last_package_distance)
+        # print("Current distance: ", current_dist)
+        if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
+            dist_change = self.last_robot_distance - current_dist
 
-            self.last_package_distance = current_dist
-            #print("Reward per pass: ", base_reward)
-            return base_reward
+            distance_reward = dist_change  # * 2
+            base_reward += distance_reward
+            #print("Reward per avvicinamento robot: ", distance_reward)
+
+        self.last_robot_distance = current_dist
+
+
+        #print("Reward per pass: ", base_reward)
+        return base_reward
 
 
 
@@ -266,8 +276,16 @@ class Robot(Agent):
                     self.carrying_package = obj
                     obj.collected = True
                     self.model.grid.remove_agent(obj)
+
                     self.target_location = obj.destination
+                    self.release_package()
+
+                    self.model.grid.remove_agent(obj)
                     return True
+                    #obj.collected = True
+                    #obj.delivered = True
+                    #self.model.grid.remove_agent(obj)
+                    #return True
         return False
 
     def release_package(self):
@@ -284,6 +302,7 @@ class Robot(Agent):
         #il rilascio e il raccoglimento di un package non conta come mossa dello step, possono muoversi dopo
         if(self.model.steps == 1):
             self.last_package_distance = self.model.get_closest_package_distance(self.pos)
+            self.last_robot_distance = self.model.get_closest_robot_distance(self.pos)
             #self.last_goal_distance = self.model.get_distance(self.pos, self.target_location)
             #print("Aggiornate le distanze")
 
@@ -388,6 +407,9 @@ class Robot(Agent):
             next_state = self.q_learning.get_state(self, next_pheromones, next_package_presence)
             self.q_learning.learn(state, action, reward, next_state)
 
+        #print("Previous pos: ", self.previous_pos)
+        self.previous_pos = self.pos
+        #print("Aggiornato previous_pos: ", self.previous_pos)
 
 
     def update_pheromone(self):
