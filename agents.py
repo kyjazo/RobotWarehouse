@@ -228,7 +228,7 @@ class Robot(Agent):
             dist_change = self.last_package_distance - current_dist
 
             distance_reward = dist_change  # * 2
-            base_reward += distance_reward
+            #base_reward += distance_reward
             #print("Reward per avvicinamento package: ", distance_reward)
 
         self.last_package_distance = current_dist
@@ -240,7 +240,7 @@ class Robot(Agent):
             dist_change = self.last_robot_distance - current_dist
 
             distance_reward = dist_change  # * 2
-            base_reward += distance_reward
+            #base_reward += distance_reward
             #print("Reward per avvicinamento robot: ", distance_reward)
 
         self.last_robot_distance = current_dist

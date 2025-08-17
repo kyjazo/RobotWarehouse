@@ -32,22 +32,31 @@ def agent_portrayal(agent):
         portrayal["zorder"] = 2
 
     elif isinstance(agent, Pheromones):
+        if agent.pheromone.robot_pheromone == 0 and agent.pheromone.package_pheromone == 0:
+            portrayal["color"] = "white"
+            portrayal["marker"] = "s"
+            portrayal["size"] = 75
+        else:
+            max_pheromone = max(agent.pheromone.robot_pheromone, agent.pheromone.package_pheromone)
+            red_intensity = (agent.pheromone.robot_pheromone / max_pheromone) if max_pheromone != 0 else 0
+            green_intensity = (agent.pheromone.package_pheromone / max_pheromone) if max_pheromone != 0 else 0
 
-       if agent.pheromone.robot_pheromone <= treshold and agent.pheromone.package_pheromone <= treshold:
-           portrayal["color"] = "white"
-           portrayal["marker"] = "s"
-           portrayal["size"] = 75
-       else:
-           max_pheromone = max(agent.pheromone.robot_pheromone, agent.pheromone.package_pheromone)
-           red_intensity = (agent.pheromone.robot_pheromone / max_pheromone) if max_pheromone != 0 else 0
-           green_intensity = (agent.pheromone.package_pheromone / max_pheromone) if max_pheromone != 0 else 0
+
+            blend_to_white = 0.5
 
 
-           red_hex = int(red_intensity * 255)
-           green_hex = int(green_intensity * 255)
-           portrayal["color"] = f"#{red_hex:02x}{green_hex:02x}00"
-           portrayal["marker"] = "s"
-           portrayal["size"] = 75
+            red_val = int(red_intensity * 255)
+            green_val = int(green_intensity * 255)
+            blue_val = 0
+
+
+            red_val = int(red_val + blend_to_white * (255 - red_val))
+            green_val = int(green_val + blend_to_white * (255 - green_val))
+            blue_val = int(blue_val + blend_to_white * (255 - blue_val))
+
+            portrayal["color"] = f"#{red_val:02x}{green_val:02x}{blue_val:02x}"
+            portrayal["marker"] = "s"
+            portrayal["size"] = 75
 
     return portrayal
 
@@ -74,11 +83,24 @@ model_params = {
         "values": [True, False],
         "label": "Render Pheromone?",
     },
+    "learning": {
+        "type": "Select",
+        "value": True,
+        "values": [True, False],
+        "label": "learning?",
+    },
+    "testing": {
+        "type": "Select",
+        "value": True,
+        "values": [True, False],
+        "label": "testing?",
+    },
 
-    "height": Slider("Height", 20, 5, 100, 5, dtype=int),
-    "width": Slider("Width", 20, 5, 100, 5, dtype=int),
-    "num_robot": Slider("Number of robots", 5, 1, 10, 1, dtype=int),
-    "num_package": Slider("Number of packages", 10, 1, 20, 1, dtype=int),
+
+    "height": Slider("Height", 45, 5, 100, 5, dtype=int),
+    "width": Slider("Width", 45, 5, 100, 5, dtype=int),
+    "num_robot": Slider("Number of robots", 10, 1, 10, 1, dtype=int),
+    "num_package": Slider("Number of packages", 20, 1, 20, 1, dtype=int),
     "num_obstacle": Slider("Number of obstacles", 128, 1, 200, 1, dtype=int),
     "pheromone_evaporation": Slider("Pheromone Evaporation", 0.1, 0, 1, 0.01, dtype=float),
     "pheromone_added": Slider("Pheromone Released", 1, 0, 10, 0.1, dtype=float),

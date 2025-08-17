@@ -224,7 +224,7 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
     plt.show()
 
 
-def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=5000):
+def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=100):
     try:
         params = base_params.copy()
 
@@ -318,7 +318,7 @@ def clean_up_q_tables(q_table_files, keep_file="q_table_avg.json"):
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
-    num_parallel_runs = 3
+    num_parallel_runs = 1
 
 
     base_params = {
@@ -397,7 +397,7 @@ if __name__ == "__main__":
             save_simulation_metadata(base_params, q_learning_params, output_dir=output_dir)
             save_q_table_to_results("q_table_avg.json", abs_output_dir)
 
-        window_size = 100
+        window_size = 1
         plot_reward(df, output_dir=output_dir, window_size=window_size)
         plot_packages_delivered(df, output_dir=output_dir, window_size=window_size)
         plot_simulation_steps(df, output_dir=output_dir, window_size=window_size)
