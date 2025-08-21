@@ -1,4 +1,6 @@
 import gc
+from collections import defaultdict
+
 import mesa
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -224,12 +226,14 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
     plt.show()
 
 
-def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=100):
+def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=5000):
     try:
         params = base_params.copy()
 
         if not base_params['testing']:
-            q_table_file = f"q_table_run_{run_id}.json"
+            run_output_dir = os.path.join("./tmp_runs", f"run_{run_id}")
+            os.makedirs(run_output_dir, exist_ok=True)
+            q_table_file = os.path.join(run_output_dir, "q_table_anchor.json")
             params["q_table_file"] = q_table_file
             q = QLearning(**q_learning_params, q_table_file=q_table_file)
         else:
@@ -262,81 +266,75 @@ def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=1
 
             print("Iteration:", iteration)
 
-        return all_results, q_table_file
+        return all_results, run_output_dir
 
     except Exception as e:
         import traceback
         print(f"⚠️ Error in simulation {run_id}: {traceback.format_exc()}")
         return [], None
-def merge_q_tables(q_table_files, output_file="q_table_avg.json"):
-    combined_q_table = {}
-    valid_files = []
+def merge_q_tables(run_dirs, output_dir, n_robots):
+    q_tables_out_dir = os.path.join(output_dir, "q_tables")
+    os.makedirs(q_tables_out_dir, exist_ok=True)
 
-    for file in q_table_files:
-        if not os.path.exists(file):
-            print(f"⚠️ Skipping missing Q-table: {file}")
-            continue
+    for idx in range(n_robots):
+        combined_q = defaultdict(lambda: defaultdict(float))
+        counts = defaultdict(lambda: defaultdict(int))
 
-        with open(file, "r") as f:
-            q_table = json.load(f)
-        valid_files.append(file)
+        for run_dir in run_dirs:
+            q_file = os.path.join(run_dir, "q_tables", f"q_table_{idx}.json")
+            if not os.path.exists(q_file):
+                continue
+            with open(q_file, "r") as f:
+                q_table = json.load(f)
 
-        for state, actions in q_table.items():
-            state = eval(state)
-            if state not in combined_q_table:
-                combined_q_table[state] = {int(a): float(v) for a, v in actions.items()}
-            else:
-                for a, v in actions.items():
-                    a = int(a)
-                    if a in combined_q_table[state]:
-                        combined_q_table[state][a] += float(v)
-                    else:
-                        combined_q_table[state][a] = float(v)
+            for state, actions in q_table.items():
+                for action, value in actions.items():
+                    combined_q[state][action] += float(value)
+                    counts[state][action] += 1
 
-    if not valid_files:
-        print("❌ No valid Q-table files found. Cannot merge.")
-        return
+        avg_q = {}
+        for state, actions in combined_q.items():
+            avg_q[state] = {}
+            for action, total in actions.items():
+                avg_q[state][action] = total / counts[state][action]
 
-    for state in combined_q_table:
-        for action in combined_q_table[state]:
-            combined_q_table[state][action] /= len(valid_files)
-
-    with open(output_file, "w") as f:
-        json.dump({str(k): v for k, v in combined_q_table.items()}, f, indent=2)
-    print(f"✅ Average Q-table saved in {output_file}")
+        out_file = os.path.join(q_tables_out_dir, f"q_table_{idx}.json")
+        with open(out_file, "w") as f:
+            json.dump(avg_q, f)
 
 
-def clean_up_q_tables(q_table_files, keep_file="q_table_avg.json"):
-    for file in q_table_files:
-        try:
-            if os.path.exists(file) and file != keep_file:
-                os.remove(file)
-                print(f"🗑️ Q-table deleted: {file}")
-        except Exception as e:
-            print(f"⚠️ Error deleting {file}: {e}")
+def clean_up_q_tables(run_dirs):
+    """
+    Rimuove le cartelle temporanee delle run dopo aver unito le Q-tables
+    """
+    for run_dir in run_dirs:
+        if os.path.exists(run_dir):
+            shutil.rmtree(run_dir)
+            print(f"🗑️ Removed temporary run directory: {run_dir}")
+
 
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
-    num_parallel_runs = 1
-
+    num_parallel_runs = 3  # Numero di run parallele
 
     base_params = {
-        "width": 20,
-        "height": 20,
-        "num_robot": 5,
+        "width": 45,
+        "height": 45,
+        "num_robot": 10,  
         "num_package": 20,
         "learning": True,
         "max_steps": 200,
         "diffusion_rate": 0.5,
         "pheromone_evaporation": 0.1,
         "testing": False,
+        "render_pheromone": False,
         "max_weight": 3,
-        "q_table_file": "",
+        "q_table_file": None,  # Sarà impostato automaticamente
     }
 
     q_learning_params = {
-        "actions": [0, 1, 2, 3],
+        "actions": [0, 1, 2, 3],  # Azioni specifiche per i robot
         "alpha": 0.1,
         "gamma": 0.99,
         "epsilon": 0.5,
@@ -345,12 +343,8 @@ if __name__ == "__main__":
     }
 
     all_results = []
-    q_tables_paths = []
-    partial_results_file = "partial_results.csv"
+    run_dirs = []  # Per tenere traccia delle cartelle temporanee
     save = True
-
-    if os.path.exists(partial_results_file):
-        os.remove(partial_results_file)
 
     try:
         with ProcessPoolExecutor(max_workers=num_parallel_runs) as executor:
@@ -359,45 +353,43 @@ if __name__ == "__main__":
 
             for i, future in enumerate(as_completed(futures)):
                 try:
-                    sim_result, q_table_file = future.result()
+                    sim_result, run_dir = future.result()
 
                     for r in sim_result:
                         r["run_id"] = i
                     all_results.extend(sim_result)
 
-                    pd.DataFrame(sim_result).to_csv(partial_results_file, mode='a', index=False,
-                                                    header=not os.path.exists(partial_results_file))
-
                     if base_params['learning'] and not base_params['testing']:
-                        q_tables_paths.append(q_table_file)
+                        run_dirs.append(run_dir)
 
                 except Exception as e:
                     import traceback
+
                     print(f"⚠️ Error in simulation {i}: {traceback.format_exc()}")
 
     except KeyboardInterrupt:
         print("⛔ Interrupted by user.")
 
     if all_results:
-        if base_params['learning'] and not base_params['testing']:
-            merge_q_tables(q_tables_paths, output_file="q_table_avg.json")
-            clean_up_q_tables(q_tables_paths, keep_file="q_table_avg.json")
-
         df = pd.DataFrame(all_results)
-        #print(all_results)
-        df = df.dropna(subset=['Reward'])
+        df = df.dropna(subset=['Reward'])  # O 'Package_delivered' a seconda dei tuoi dati
 
+        output_dir, abs_output_dir = get_next_test_folder(
+            base_params['testing'],
+            base_params['learning']
+        )
 
-        #print(all_results)
-
-
-        output_dir, abs_output_dir = get_next_test_folder(base_params['testing'], base_params['learning'])
+        if base_params['learning'] and not base_params['testing']:
+            # Unisci le Q-tables dalle diverse run
+            merge_q_tables(run_dirs, abs_output_dir, n_robots=base_params["num_robot"])
+            # Pulisci le cartelle temporanee
+            clean_up_q_tables(run_dirs)
 
         if save:
             save_simulation_metadata(base_params, q_learning_params, output_dir=output_dir)
-            save_q_table_to_results("q_table_avg.json", abs_output_dir)
 
-        window_size = 1
+        # Plot dei risultati
+        window_size = 100
         plot_reward(df, output_dir=output_dir, window_size=window_size)
         plot_packages_delivered(df, output_dir=output_dir, window_size=window_size)
         plot_simulation_steps(df, output_dir=output_dir, window_size=window_size)

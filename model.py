@@ -1,5 +1,5 @@
 import math
-
+import os
 from mesa import Model
 import mesa
 from mesa.space import MultiGrid, PropertyLayer
@@ -88,7 +88,25 @@ class WarehouseModel(Model):
     def place_agents(self, agent_class, num_agents):
 
         if agent_class.__name__ == "Robot":
-            agents = agent_class.create_agents(model=self, n=num_agents, q_learning=self.q_learning)
+            q_tables_dir = None
+            if getattr(self, "q_table_file", None):
+                q_tables_dir = os.path.join(os.path.dirname(os.path.abspath(self.q_table_file)), "q_tables")
+
+            agents = []
+            if q_tables_dir and os.path.isdir(q_tables_dir):
+                for i in range(num_agents):
+                    candidate = os.path.join(q_tables_dir, f"q_table_{i}.json")
+                    if os.path.exists(candidate):
+                        #print(f"[DEBUG] Robot {i} carica q_table da: {candidate}")
+                        agent = Robot(self, q_table_file=candidate, q_learning=self.q_learning)
+                    else:
+                        #print(f"[DEBUG] Robot {i} parte con q_table vuota (nessun file trovato)")
+                        agent = Robot(self, q_table_file=None, q_learning=self.q_learning)
+                    agents.append(agent)
+            else:
+                for i in range(num_agents):
+                    agent = Robot(self, q_table_file=None, q_learning=self.q_learning)
+                    agents.append(agent)
             positions = []
             while len(positions) < num_agents:
                 x = self.random.randint(0, self.grid.width - 1)
@@ -346,27 +364,25 @@ class WarehouseModel(Model):
         if not self.learning or not hasattr(self, 'q_table_file') or not self.q_table_file:
             return
 
-        q_tables = {}
-        for agent in self.agents:
-            if isinstance(agent, Robot):
-                for state, actions in agent.q_learning.q_table.items():
-                    if state not in q_tables:
-                        q_tables[state] = actions
-                    else:
-                        for action, value in actions.items():
-                            if action in q_tables[state]:
-                                q_tables[state][action] = (q_tables[state][action] + value) / 2
-                            else:
-                                q_tables[state][action] = value
+        q_tables_dir = os.path.join(os.path.dirname(os.path.abspath(self.q_table_file)), "q_tables")
+        os.makedirs(q_tables_dir, exist_ok=True)
 
-        if q_tables:
-            temp_q_learning = QLearning(actions=[0, 1, 2, 3])
-            temp_q_learning.q_table = q_tables
-            temp_q_learning.save_q_table(self.q_table_file)
-            #print("Saved: ", self.q_table_file)
+        robot_agents = [a for a in self.agents if isinstance(a, Robot)]
+
+        for idx, robot in enumerate(robot_agents):
+            if hasattr(robot, 'q_learning') and robot.q_learning:
+                filename = os.path.join(q_tables_dir, f"q_table_{idx}.json")
+                try:
+                    robot.q_learning.save_q_table(filename)
+                except Exception as e:
+                    print(f"⚠️ Error saving q_table for robot idx={idx}: {e}")
+                #print(f"[DEBUG] Q-table del Robot {idx} salvata in: {filename}")
+
+    def __del__(self):
+        self.save_q_tables()
     def step(self):
 
-
+        #print(self.package_pheromone_layer.data)
 
         if self.check_packages() or self.steps >= self.max_steps:
             #for agent in self.agents:

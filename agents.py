@@ -106,7 +106,7 @@ class QLearning:
             holding_package = True
         holding_package = int(holding_package)
 
-        return (max_index, package_presence, robot_presence, holding_package)
+        return (max_index, package_presence, robot_presence)
 
     def choose_action(self, state):
 
@@ -139,14 +139,15 @@ class Robot(Agent):
         self.action_counts = {0: 0, 1: 0, 2: 0, 3: 0}
         self.package_delivered = 0
         self.previous_pos = self.pos
+        self.released_pheromone = False
 
-        if self.q_learning != None:
-
+        if self.q_learning is not None:
             self.q_learning = QLearning(q_learning=self.model.q_learning,
                                         q_table_file=q_table_file)
         else:
             self.q_learning = QLearning()
-            #self.q_learning.load_q_table(model.q_table_file)
+            if q_table_file and os.path.exists(q_table_file):
+                self.q_learning.load_q_table(q_table_file)
 
         #print(self.q_learning.epsilon)
         self.rewards = []
@@ -204,14 +205,32 @@ class Robot(Agent):
         base_reward += self.shared_reward
         self.shared_reward = 0
 
-        if self.previous_pos == self.pos:
-            #print("Penalità per essere rimasto fermo")
-            base_reward -= 1
+        #if self.previous_pos == self.pos:
+        #    #print("Penalità per essere rimasto fermo")
+        #
+        #    base_reward -= 1
+        if self.released_pheromone: #se rilascio feromoni senza package vicino ho penalità e viceversa
+            self.released_pheromone = False
+            valid_release = False
+            possible_steps = self.model.grid.get_neighborhood(
+                self.pos, moore=True, include_center=False, radius=1)
+
+            for step in possible_steps:
+                cell_contents = self.model.grid.get_cell_list_contents([step])
+                for obj in cell_contents:
+                    if isinstance(obj, Package) and not obj.collected:
+                        valid_release = True
+
+            if valid_release:
+                base_reward += 1
+            else:
+                base_reward -= 1
+
 
         if self.picked_package:
             #print("ho raccolto un package allo step:", self.model.steps)
 
-            base_reward += 10.0
+            base_reward += 20.0
 
 
             self.last_package_distance = self.model.get_closest_package_distance(self.pos)
@@ -228,7 +247,7 @@ class Robot(Agent):
             dist_change = self.last_package_distance - current_dist
 
             distance_reward = dist_change  # * 2
-            #base_reward += distance_reward
+            base_reward += distance_reward
             #print("Reward per avvicinamento package: ", distance_reward)
 
         self.last_package_distance = current_dist
@@ -239,8 +258,8 @@ class Robot(Agent):
         if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
             dist_change = self.last_robot_distance - current_dist
 
-            distance_reward = dist_change  # * 2
-            #base_reward += distance_reward
+            distance_reward = dist_change * 2
+            base_reward += distance_reward
             #print("Reward per avvicinamento robot: ", distance_reward)
 
         self.last_robot_distance = current_dist
@@ -249,7 +268,9 @@ class Robot(Agent):
         #print("Reward per pass: ", base_reward)
         return base_reward
 
-
+    def __del__(self):
+        if hasattr(self, 'q_learning') and self.q_learning and hasattr(self, 'q_table_file') and self.q_table_file:
+            self.q_learning.save_q_table(self.q_table_file)
 
     def get_package(self):
 
@@ -370,6 +391,7 @@ class Robot(Agent):
 
         elif action == 2:
             self.update_pheromone()
+            self.released_pheromone = True
         else:
             best_steps = self.get_best_step(possible_steps, pheromones, action)
             if best_steps:
