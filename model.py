@@ -327,7 +327,7 @@ class WarehouseModel(Model):
                     return False
         return True
 
-    def get_closest_package_distance(self, pos, radius=5):
+    def get_closest_package_distance(self, pos, radius=10):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         package = [agent for agent in neighbors if isinstance(agent, Package) and not agent.collected]
@@ -336,7 +336,7 @@ class WarehouseModel(Model):
             return radius + 1
 
         return min(self.get_distance(pos, s.pos) for s in package)
-    def get_closest_robot_distance(self, pos, radius=5):
+    def get_closest_robot_distance(self, pos, radius=10):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         robot = [agent for agent in neighbors if isinstance(agent, Robot)]
@@ -347,13 +347,11 @@ class WarehouseModel(Model):
         return min(self.get_distance(pos, s.pos) for s in robot)
 
     def get_distance(self, pos1, pos2):
-
+        """
+        Calcola la distanza Euclidea per griglia NON toroidale.
+        """
         dx = abs(pos1[0] - pos2[0])
         dy = abs(pos1[1] - pos2[1])
-
-        dx = min(dx, self.grid.width - dx)
-        dy = min(dy, self.grid.height - dy)
-
         return math.sqrt(dx ** 2 + dy ** 2)
 
     def decay_epsilon(self):
