@@ -136,20 +136,20 @@ class WarehouseModel(Model):
             #    (8, 8), (8, 9), (9, 8), (9, 9),
             #    (14, 14), (14, 15), (15, 14), (15, 15),
             #    (18, 2), (18, 3), (19, 2), (19, 3),
-###
+####
             #    # Blocchi 1x3 orizzontali
             #    (2, 10), (2, 11), (2, 12),
             #    (10, 18), (10, 19),
-###
+####
             #    # Blocchi 1x3 verticali
             #    (12, 2), (13, 2), (14, 2),
             #    (6, 16), (7, 16), (8, 16),
-###
+####
             #    # Blocchi a L
             #    (5, 15), (5, 16), (6, 15),  # L in alto a destra
             #    (15, 5), (16, 5), (15, 6),  # L in basso a sinistra
             #    (11, 11), (11, 12), (12, 11),  # L centrale
-###
+####
             #    # Ostacoli sparsi per raggiungere il 30%
             #    (1, 1), (1, 18), (18, 1), (18, 18),  # Angoli
             #    (7, 3), (7, 4), (12, 17), (13, 17),
@@ -178,7 +178,7 @@ class WarehouseModel(Model):
                 (42, 12), (42, 13), (43, 12), (43, 13),
                 (42, 22), (42, 23), (43, 22), (43, 23),
                 (42, 32), (42, 33), (43, 32), (43, 33),
-
+#
                 # --- Blocchi 1x3 orizzontali (esistenti + estesi) ---
                 (6, 6), (6, 7), (6, 8),
                 (6, 16), (6, 17), (6, 18),
@@ -196,7 +196,7 @@ class WarehouseModel(Model):
                 (36, 16), (36, 17), (36, 18),
                 (36, 26), (36, 27), (36, 28),
                 (36, 36), (36, 37), (36, 38),
-
+#
                 # --- Blocchi 1x3 verticali (esistenti + estesi) ---
                 (6, 10), (7, 10), (8, 10),
                 (6, 20), (7, 20), (8, 20),
@@ -214,7 +214,7 @@ class WarehouseModel(Model):
                 (36, 20), (37, 20), (38, 20),
                 (36, 30), (37, 30), (38, 30),
                 (36, 40), (37, 40), (38, 40),
-
+#
                 # --- Blocchi a L (esistenti + nuovi) ---
                 (5, 5), (5, 6), (6, 5),
                 (5, 15), (5, 16), (6, 15),
@@ -232,7 +232,7 @@ class WarehouseModel(Model):
                 (35, 15), (36, 15), (35, 16),
                 (35, 25), (36, 25), (35, 26),
                 (35, 35), (36, 35), (35, 36),
-
+#
                 # --- Extra cluster sparsi (nuovi per coprire bordi e angoli) ---
                 # Angoli superiori/inferiori
                 (0, 0), (0, 1), (1, 0), (1, 1),  # Angolo in alto a sinistra
@@ -254,10 +254,10 @@ class WarehouseModel(Model):
                 (40, 30), (41, 30), (40, 31), (41, 31),
             ]
             positions = [
-
+#
                 (x, y) for x, y in obstacle_pattern
                 if 0 <= x < self.grid.width and 0 <= y < self.grid.height
-
+#
             ]
 
             #if len(positions) < num_agents:
@@ -278,7 +278,9 @@ class WarehouseModel(Model):
             self.grid.place_agent(agent, tuple(pos))
 
     def diffuse_pheromones(self):
+        # Crea copie di entrambi gli strati di feromoni
         new_package_layer = self.package_pheromone_layer.data.copy()
+        new_robot_layer = self.robot_pheromone_layer.data.copy()
 
         directions = [(0, 1), (1, 0), (0, -1), (-1, 0),
                       (1, 1), (1, -1), (-1, 1), (-1, -1)]
@@ -287,35 +289,47 @@ class WarehouseModel(Model):
 
         for x in range(self.grid.width):
             for y in range(self.grid.height):
+                # Diffusione feromoni package
+                current_package_pheromone = self.package_pheromone_layer.data[x, y]
+                if current_package_pheromone >= self.pheromone_treshold:
+                    total_package_diffused = 0
+                    for dx, dy in directions:
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < self.grid.width and 0 <= ny < self.grid.height:
+                            amount_diffused = current_package_pheromone * fraction_per_direction
+                            new_package_layer[nx, ny] += amount_diffused
+                            total_package_diffused += amount_diffused
+                    new_package_layer[x, y] -= total_package_diffused
 
-                current_pheromone = self.package_pheromone_layer.data[x, y]
-                if current_pheromone < self.pheromone_treshold:
-                    continue
-                total_diffused = 0
+                # Diffusione feromoni robot
+                current_robot_pheromone = self.robot_pheromone_layer.data[x, y]
+                if current_robot_pheromone >= self.pheromone_treshold:
+                    total_robot_diffused = 0
+                    for dx, dy in directions:
+                        nx, ny = x + dx, y + dy
+                        if 0 <= nx < self.grid.width and 0 <= ny < self.grid.height:
+                            amount_diffused = current_robot_pheromone * fraction_per_direction
+                            new_robot_layer[nx, ny] += amount_diffused
+                            total_robot_diffused += amount_diffused
+                    new_robot_layer[x, y] -= total_robot_diffused
 
-                for dx, dy in directions:
-                    nx, ny = x + dx, y + dy
-
-                    if 0 <= nx < self.grid.width and 0 <= ny < self.grid.height:
-                        amount_diffused = current_pheromone * fraction_per_direction
-
-                        new_package_layer[nx, ny] += amount_diffused
-                        total_diffused += amount_diffused
-
-                new_package_layer[x, y] -= total_diffused
-
+        # Aggiorna entrambi gli strati
         self.package_pheromone_layer.data = new_package_layer
+        self.robot_pheromone_layer.data = new_robot_layer
 
     def evaporate_pheromones(self):
 
         for x in range(self.grid.width):
             for y in range(self.grid.height):
                 current_package = self.package_pheromone_layer.data[x, y]
+                current_robot = self.robot_pheromone_layer.data[x, y]
 
-                if current_package < self.pheromone_treshold:
-                    continue
+                if current_package > self.pheromone_treshold:
+                    self.package_pheromone_layer.set_cell((x, y), current_package * (1 - self.pheromone_evaporation))
 
-                self.package_pheromone_layer.set_cell((x, y), current_package * (1 - self.pheromone_evaporation))
+                if current_robot > self.pheromone_treshold:
+                    self.robot_pheromone_layer.set_cell((x, y), current_robot * (1 - self.pheromone_evaporation))
+
 
 
 
@@ -327,7 +341,7 @@ class WarehouseModel(Model):
                     return False
         return True
 
-    def get_closest_package_distance(self, pos, radius=10):
+    def get_closest_package_distance(self, pos, radius=5):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         package = [agent for agent in neighbors if isinstance(agent, Package) and not agent.collected]
@@ -336,7 +350,7 @@ class WarehouseModel(Model):
             return radius + 1
 
         return min(self.get_distance(pos, s.pos) for s in package)
-    def get_closest_robot_distance(self, pos, radius=10):
+    def get_closest_robot_distance(self, pos, radius=5):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         robot = [agent for agent in neighbors if isinstance(agent, Robot)]
@@ -393,6 +407,7 @@ class WarehouseModel(Model):
             self.save_q_tables()
 
         else:
+            #print(self.robot_pheromone_layer.data)
 
             for agent in self.agents:
                 if isinstance(agent, Package):

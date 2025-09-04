@@ -226,10 +226,10 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
     plt.show()
 
 
-def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=5000):
+def run_single_simulation(run_id, base_params, q_learning_params, num_episodes= 5000):
     try:
         params = base_params.copy()
-
+        run_output_dir = None
         if not base_params['testing']:
             run_output_dir = os.path.join("./tmp_runs", f"run_{run_id}")
             os.makedirs(run_output_dir, exist_ok=True)
@@ -239,6 +239,7 @@ def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=5
         else:
             q_table_file = params['q_table_file']
             q = QLearning(**q_learning_params, q_table_file=q_table_file)
+            run_output_dir = "./"
 
         all_results = []
 
@@ -266,7 +267,7 @@ def run_single_simulation(run_id, base_params, q_learning_params, num_episodes=5
 
             print("Iteration:", iteration)
 
-        return all_results, run_output_dir
+        return all_results, run_output_dir if run_output_dir else None
 
     except Exception as e:
         import traceback
@@ -300,7 +301,7 @@ def merge_q_tables(run_dirs, output_dir, n_robots):
 
         out_file = os.path.join(q_tables_out_dir, f"q_table_{idx}.json")
         with open(out_file, "w") as f:
-            json.dump(avg_q, f)
+            json.dump(avg_q, f, indent=4, ensure_ascii=False, sort_keys=True)
 
 
 def clean_up_q_tables(run_dirs):
@@ -321,7 +322,7 @@ if __name__ == "__main__":
     base_params = {
         "width": 45,
         "height": 45,
-        "num_robot": 10,  
+        "num_robot": 10,
         "num_package": 20,
         "learning": True,
         "max_steps": 200,
@@ -372,7 +373,10 @@ if __name__ == "__main__":
 
     if all_results:
         df = pd.DataFrame(all_results)
-        df = df.dropna(subset=['Reward'])  # O 'Package_delivered' a seconda dei tuoi dati
+
+        if not base_params['testing']:
+            df = df.dropna(subset=['Reward'])
+        print(df)
 
         output_dir, abs_output_dir = get_next_test_folder(
             base_params['testing'],
@@ -380,15 +384,15 @@ if __name__ == "__main__":
         )
 
         if base_params['learning'] and not base_params['testing']:
-            # Unisci le Q-tables dalle diverse run
+
             merge_q_tables(run_dirs, abs_output_dir, n_robots=base_params["num_robot"])
-            # Pulisci le cartelle temporanee
+
             clean_up_q_tables(run_dirs)
 
         if save:
             save_simulation_metadata(base_params, q_learning_params, output_dir=output_dir)
 
-        # Plot dei risultati
+
         window_size = 100
         plot_reward(df, output_dir=output_dir, window_size=window_size)
         plot_packages_delivered(df, output_dir=output_dir, window_size=window_size)
