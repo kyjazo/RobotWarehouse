@@ -38,7 +38,7 @@ class QLearning:
         # print(os.path.exists(q_table_file))
         if q_table_file and os.path.exists(q_table_file):
             self.load_q_table(q_table_file)
-            # print("Ho caricato i pesi del file: ", q_table_file)
+            #print("Ho caricato i pesi del file: ", q_table_file)
 
         #print("Creato q_learning con epsilon: ", self.epsilon)
 
@@ -94,14 +94,16 @@ class QLearning:
             )
             # Concentrazione discretizzata
 
-        concentrations = [(ph.package_pheromone, ph.robot_pheromone) for ph in pheromones]
-        if concentrations:
-            max_package, max_robot = max(concentrations, key=lambda x: max(x))
-            #print("Max package: ", max_package)
-            #print("Max robot: ", max_robot)
-            max_val = max(max_package, max_robot)
+        #print("Pheromones: ", pheromones)
+        if pheromones:
+            max_package = max(ph.package_pheromone for ph in pheromones)
+            max_robot = max(ph.robot_pheromone for ph in pheromones)
         else:
-            max_package, max_robot, max_val = 0, 0, 0
+            max_package = 0.0
+            max_robot = 0.0
+        #print("max_package: ", max_package)
+        #print("max_robot: ", max_robot)
+        max_val = max(max_package, max_robot)
 
         if max_val == 0:
             feromone_level = 0
@@ -124,11 +126,7 @@ class QLearning:
 
         package_presence = int(package_presence)
         robot_presence = int(robot_presence)
-        if robot.carrying_package is None:
-            holding_package = False
-        else:
-            holding_package = True
-        holding_package = int(holding_package)
+
 
         return (feromone_level, feromone_type, package_presence, robot_presence)
 
@@ -166,8 +164,8 @@ class Robot(Agent):
         self.released_pheromone = False
         self.last_weight_picked = 0
         self.moved = False #True se un agente si è mosso
-        self.first_reach = True #True quando raggiunge un pacco, si resetta solo dopo averne raccolto uno
-
+        self.first_reach = False #True quando raggiunge un pacco, si resetta solo dopo averne raccolto uno
+        self.enable_first_reach = True
         if self.q_learning is not None:
             self.q_learning = QLearning(q_learning=self.model.q_learning,
                                         q_table_file=q_table_file)
@@ -190,12 +188,14 @@ class Robot(Agent):
 
     def get_best_step(self, possible_steps, pheromones, action=None):
         valid_steps = []
+        #print("Possible_steps: ", possible_steps)
         for step in possible_steps:
             cell_contents = self.model.grid.get_cell_list_contents([step])
             is_free = not any(isinstance(obj, (Obstacle, Package)) for obj in cell_contents)
             if is_free:
                 valid_steps.append(step)
         possible_steps = valid_steps
+        #print("Valid_steps: ", possible_steps)
         threshold = self.model.pheromone_treshold
         filtered_pheromones = []
         for ph in pheromones:
@@ -203,16 +203,16 @@ class Robot(Agent):
             package_conc = ph.package_pheromone if ph.package_pheromone >= threshold else 0
             filtered_pheromones.append(Pheromone(robot_pheromone=robot_conc, package_pheromone=package_conc))
         pheromones = filtered_pheromones
-        if self.carrying_package:
-            min_distance = float('inf')
-            for step in possible_steps:
-                distance = abs(step[0] - self.target_location[0]) + abs(step[1] - self.target_location[1])
-                if distance < min_distance:
-                    min_distance = distance
-                    best_steps = [step]
-                elif distance == min_distance:
-                    best_steps.append(step)
-            return best_steps
+        #if self.carrying_package:
+        #    min_distance = float('inf')
+        #    for step in possible_steps:
+        #        distance = abs(step[0] - self.target_location[0]) + abs(step[1] - self.target_location[1])
+        #        if distance < min_distance:
+        #            min_distance = distance
+        #            best_steps = [step]
+        #        elif distance == min_distance:
+        #            best_steps.append(step)
+        #    return best_steps
         if action == 0: #mi avvicino al pacco
             pheromone_concentrations = [ph.package_pheromone for ph in pheromones]
             max_pheromone = max(pheromone_concentrations)
@@ -355,7 +355,7 @@ class Robot(Agent):
 
         # --- Raggiunto package (prima volta) ---
         if self.first_reach:
-            neighborhood = self.model.grid.get_neighborhood(self.pos, moore=True, include_center=False, radius=1)
+            neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
             for step in neighborhood:
                 for obj in self.model.grid.get_cell_list_contents([step]):
                     if isinstance(obj, Package) and not obj.collected:
@@ -373,18 +373,20 @@ class Robot(Agent):
                     if isinstance(obj, Package) and not obj.collected:
                         valid_release = True
             if valid_release:
-                reward += 2  # premio se vicino a un pacco
+                reward += 0.6  # premio se vicino a un pacco
                 #print("+ valid release: ", reward)
             else:
-                reward -= 3  # penalità se spammi feromone a caso
+                reward -= 2  # penalità se spammi feromone a caso
                 #print("+ invalid release: ", reward)
 
         # --- Pickup package ---
         if self.picked_package:
             reward += 10 * self.last_weight_picked
+
             #print("+ picked package: ", reward)
             self.last_weight_picked = 0
             self.picked_package = False
+            self.enable_first_reach = True
 
         # --- Shaping: distanza da package più vicino ---
         current_dist = self.model.get_closest_package_distance(self.pos)
@@ -398,7 +400,7 @@ class Robot(Agent):
         current_robot_dist = self.model.get_closest_robot_distance(self.pos)
         if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
             dist_change_robot = self.last_robot_distance - current_robot_dist
-            reward += dist_change_robot * 0.2
+            reward += dist_change_robot * 0.4
             #print("+avvicinamento robot: ", reward)
         self.last_robot_distance = current_robot_dist
 
@@ -420,6 +422,10 @@ class Robot(Agent):
         for step in possible_steps:
             cell_contents = self.model.grid.get_cell_list_contents([step])
             for obj in cell_contents:
+
+                if isinstance(obj, Package) and self.enable_first_reach:
+                    self.first_reach = True
+                    self.enable_first_reach = False
                 if isinstance(obj, Package) and not obj.collected and obj.check_robot_nearby() >= obj.weight:
                     #print("Pacco raccolto con peso: ", obj.weight)
 
@@ -435,7 +441,6 @@ class Robot(Agent):
 
 
                     self.carrying_package = obj
-                    self.first_reach = True
                     obj.collected = True
                     self.model.grid.remove_agent(obj)
                     self.last_weight_picked = obj.weight
@@ -472,17 +477,17 @@ class Robot(Agent):
             #print("Aggiornate le distanze")
 
 
-        if self.pos == self.target_location:
-            #print("package rilasciato")
-            self.release_package()
-            self.last_package_distance = self.model.get_closest_package_distance(self.pos)
-            return
+        #if self.pos == self.target_location:
+        #    #print("package rilasciato")
+        #    self.release_package()
+        #    self.last_package_distance = self.model.get_closest_package_distance(self.pos)
+        #    return
 
 
 
 
         possible_steps = self.model.grid.get_neighborhood(
-            self.pos, moore=True, include_center=True, radius=1) #include center ora è True
+            self.pos, moore=True, include_center=False, radius=1) #include center ora è True
         
 
 
@@ -496,27 +501,27 @@ class Robot(Agent):
                  Pheromone())
             for step in possible_steps
         ]
-        if self.carrying_package:
-            #print("ho in mano un package")
-            valid_steps = []
-            for step in possible_steps:
-                cell_contents = self.model.grid.get_cell_list_contents([step])
-                is_free = not any(isinstance(obj, (Obstacle, Package)) for obj in cell_contents)
-                if is_free:
-                    valid_steps.append(step)
-            min_distance = float('inf')
-
-            for step in valid_steps:
-                distance = abs(step[0] - self.target_location[0]) + abs(step[1] - self.target_location[1])
-
-                if distance < min_distance:
-                    min_distance = distance
-                    best_steps = [step]
-                elif distance == min_distance:
-                    best_steps.append(step)
-            if best_steps:
-                self.model.grid.move_agent(self, self.random.choice(best_steps))
-            return
+        #if self.carrying_package:
+        #    #print("ho in mano un package")
+        #    valid_steps = []
+        #    for step in possible_steps:
+        #        cell_contents = self.model.grid.get_cell_list_contents([step])
+        #        is_free = not any(isinstance(obj, (Obstacle, Package)) for obj in cell_contents)
+        #        if is_free:
+        #            valid_steps.append(step)
+        #    min_distance = float('inf')
+#
+        #    for step in valid_steps:
+        #        distance = abs(step[0] - self.target_location[0]) + abs(step[1] - self.target_location[1])
+#
+        #        if distance < min_distance:
+        #            min_distance = distance
+        #            best_steps = [step]
+        #        elif distance == min_distance:
+        #            best_steps.append(step)
+        #    if best_steps:
+        #        self.model.grid.move_agent(self, self.random.choice(best_steps))
+        #    return
         #se ho un package mi muovo verso la destinazione e salto lo step di reward
 
         #print("Mi muovo usando q-learning")
@@ -528,12 +533,12 @@ class Robot(Agent):
         else:
             action = -1
 
-        if self.carrying_package:
-            best_steps = self.get_best_step(possible_steps, pheromones)
-            if best_steps:
-                self.model.grid.move_agent(self, self.random.choice(best_steps))
+        #if self.carrying_package:
+        #    best_steps = self.get_best_step(possible_steps, pheromones)
+        #    if best_steps:
+        #        self.model.grid.move_agent(self, self.random.choice(best_steps))
 
-        elif action == 2: #se rilascio feromoni non mi muovo
+        if action == 2: #se rilascio feromoni non mi muovo
             self.update_pheromone()
             self.released_pheromone = True
         else:
@@ -547,7 +552,7 @@ class Robot(Agent):
 
 
         if self.use_learning:
-
+            #print("Azione: ", action)
             reward = self.calculate_reward()
             #if action == 3:
             #    print("Reward per azione random: ", reward)
@@ -564,7 +569,7 @@ class Robot(Agent):
             self.rewards.append(reward)
 
             next_possible_steps = self.model.grid.get_neighborhood(
-                self.pos, moore=True, include_center=True
+                self.pos, moore=True, include_center=False
             )
             next_pheromones = [
                 Pheromone(

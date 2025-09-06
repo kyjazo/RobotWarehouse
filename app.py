@@ -97,10 +97,10 @@ model_params = {
     },
 
 
-    "height": Slider("Height", 45, 5, 100, 5, dtype=int),
-    "width": Slider("Width", 45, 5, 100, 5, dtype=int),
+    "height": Slider("Height", 20, 5, 100, 5, dtype=int),
+    "width": Slider("Width", 20, 5, 100, 5, dtype=int),
     "num_robot": Slider("Number of robots", 10, 1, 10, 1, dtype=int),
-    "num_package": Slider("Number of packages", 20, 1, 20, 1, dtype=int),
+    "num_package": Slider("Number of packages", 40, 1, 50, 1, dtype=int),
     "num_obstacle": Slider("Number of obstacles", 128, 1, 200, 1, dtype=int),
     "pheromone_evaporation": Slider("Pheromone Evaporation", 0.1, 0, 1, 0.01, dtype=float),
     "pheromone_added": Slider("Pheromone Released", 1, 0, 10, 0.1, dtype=float),
