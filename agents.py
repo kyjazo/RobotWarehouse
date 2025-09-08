@@ -187,22 +187,7 @@ class Robot(Agent):
 
 
     def get_best_step(self, possible_steps, pheromones, action=None):
-        valid_steps = []
-        #print("Possible_steps: ", possible_steps)
-        for step in possible_steps:
-            cell_contents = self.model.grid.get_cell_list_contents([step])
-            is_free = not any(isinstance(obj, (Obstacle, Package)) for obj in cell_contents)
-            if is_free:
-                valid_steps.append(step)
-        possible_steps = valid_steps
-        #print("Valid_steps: ", possible_steps)
-        threshold = self.model.pheromone_treshold
-        filtered_pheromones = []
-        for ph in pheromones:
-            robot_conc = ph.robot_pheromone if ph.robot_pheromone >= threshold else 0
-            package_conc = ph.package_pheromone if ph.package_pheromone >= threshold else 0
-            filtered_pheromones.append(Pheromone(robot_pheromone=robot_conc, package_pheromone=package_conc))
-        pheromones = filtered_pheromones
+
         #if self.carrying_package:
         #    min_distance = float('inf')
         #    for step in possible_steps:
@@ -227,23 +212,30 @@ class Robot(Agent):
             return [self.random.choice(possible_steps)]
         elif action == -1:  # baseline senza Q-learning
             #print("Eseguo l'azione non learning")
-            # 1) Se vicino a un package non raccolto -> resto fermo e rilascio feromone robot
             neighborhood = self.model.grid.get_neighborhood(self.pos, moore=True, include_center=False, radius=1)
             for cell in neighborhood:
                 for obj in self.model.grid.get_cell_list_contents([cell]):
                     if isinstance(obj, Package) and not obj.collected:
-                        # rilascio feromone robot e non mi muovo
-                        self.update_pheromone()
-                        self.released_pheromone = True
-                        return [self.pos]
-            # 2) Altrimenti: muoviti verso la cella col feromone più alto (package o robot)
-            if pheromones:
-                values = [max(ph.package_pheromone, ph.robot_pheromone) for ph in pheromones]
-                max_val = max(values)
-                if max_val > 0:
-                    best = [step for step, val in zip(possible_steps, values) if val == max_val]
-                    return best
-            # 3) Fallback: random
+                        if self.random.random() < 0.5:
+                            self.update_pheromone()
+                            self.released_pheromone = True
+                            return [self.pos]  # resta fermo
+                        else:
+                            # invece di restare fermo, vai verso robot feromone o random
+                            pher_robot = [ph.robot_pheromone for ph in pheromones]
+                            max_robot = max(pher_robot, default=0)
+                            if max_robot > 0:
+                                return [step for step, val in zip(possible_steps, pher_robot) if val == max_robot]
+                            return [self.random.choice(possible_steps)]
+
+            pher_robot = [ph.robot_pheromone for ph in pheromones]
+            if max(pher_robot) > 0:
+                return [step for step, val in zip(possible_steps, pher_robot) if val == max(pher_robot)]
+
+            pher_package = [ph.package_pheromone for ph in pheromones]
+            if max(pher_package) > 0:
+                return [step for step, val in zip(possible_steps, pher_package) if val == max(pher_package)]
+
             return [self.random.choice(possible_steps)]
 
 
@@ -367,16 +359,16 @@ class Robot(Agent):
         if self.released_pheromone:
             self.released_pheromone = False
             valid_release = False
-            neighborhood = self.model.grid.get_neighborhood(self.pos, moore=True, include_center=False, radius=1)
+            neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
             for step in neighborhood:
                 for obj in self.model.grid.get_cell_list_contents([step]):
                     if isinstance(obj, Package) and not obj.collected:
                         valid_release = True
             if valid_release:
-                reward += 0.6  # premio se vicino a un pacco
+                reward += 2  # premio se vicino a un pacco
                 #print("+ valid release: ", reward)
             else:
-                reward -= 2  # penalità se spammi feromone a caso
+                reward -= 5  # penalità se spammi feromone a caso
                 #print("+ invalid release: ", reward)
 
         # --- Pickup package ---
@@ -388,24 +380,37 @@ class Robot(Agent):
             self.picked_package = False
             self.enable_first_reach = True
 
-        # --- Shaping: distanza da package più vicino ---
-        current_dist = self.model.get_closest_package_distance(self.pos)
-        if hasattr(self, 'last_package_distance') and self.model.steps > 0:
-            dist_change = self.last_package_distance - current_dist
-            reward += dist_change * 0.5  # piccolo shaping
-            #print("+ avvicinamento package: ", reward)
-        self.last_package_distance = current_dist
+        ## --- Shaping: distanza da package più vicino ---
+        #current_dist = self.model.get_closest_package_distance(self.pos)
+        #if hasattr(self, 'last_package_distance') and self.model.steps > 0:
+        #    dist_change = self.last_package_distance - current_dist
+        #    reward += dist_change * 0.5  # piccolo shaping
+        #    #print("+ avvicinamento package: ", reward)
+        #self.last_package_distance = current_dist
+#
+        ## --- Shaping: distanza da robot (utile per coordinarsi) ---
+        #current_robot_dist = self.model.get_closest_robot_distance(self.pos)
+        #if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
+        #    dist_change_robot = self.last_robot_distance - current_robot_dist
+        #    reward += dist_change_robot * 1
+        #    #print("+avvicinamento robot: ", reward)
+        #self.last_robot_distance = current_robot_dist
 
-        # --- Shaping: distanza da robot (utile per coordinarsi) ---
-        current_robot_dist = self.model.get_closest_robot_distance(self.pos)
-        if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
-            dist_change_robot = self.last_robot_distance - current_robot_dist
-            reward += dist_change_robot * 0.4
-            #print("+avvicinamento robot: ", reward)
-        self.last_robot_distance = current_robot_dist
+        (x, y) = self.pos
+        if self.model.steps > 0 and self.moved:
+            package_pheromone = self.model.package_pheromone_layer.data[x, y]
+            #print("Package_pheromone: ", package_pheromone)
+            reward += package_pheromone
+
+            robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 2
+            #print("Robot_pheromone: ", robot_pheromone)
+            reward += robot_pheromone
+            self.moved = False
+
+
 
         # --- Costo energetico per step ---
-        reward -= 0.1
+        reward -= 1
         #print("reward finale: ", reward)
         return reward
 
@@ -488,7 +493,15 @@ class Robot(Agent):
 
         possible_steps = self.model.grid.get_neighborhood(
             self.pos, moore=True, include_center=False, radius=1) #include center ora è True
-        
+
+        valid_steps = []
+
+        for step in possible_steps:
+            cell_contents = self.model.grid.get_cell_list_contents([step])
+            is_free = not any(isinstance(obj, (Obstacle, Package)) for obj in cell_contents)
+            if is_free:
+                valid_steps.append(step)
+        possible_steps = valid_steps
 
 
         pheromones = [
@@ -501,6 +514,18 @@ class Robot(Agent):
                  Pheromone())
             for step in possible_steps
         ]
+
+
+        threshold = self.model.pheromone_treshold
+        filtered_pheromones = []
+        for ph in pheromones:
+            robot_conc = ph.robot_pheromone if ph.robot_pheromone >= threshold else 0
+            package_conc = ph.package_pheromone if ph.package_pheromone >= threshold else 0
+            filtered_pheromones.append(Pheromone(robot_pheromone=robot_conc, package_pheromone=package_conc))
+        pheromones = filtered_pheromones
+
+
+
         #if self.carrying_package:
         #    #print("ho in mano un package")
         #    valid_steps = []

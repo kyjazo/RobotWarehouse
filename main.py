@@ -324,11 +324,11 @@ if __name__ == "__main__":
         "height": 20,
         "num_robot": 10,
         "num_package": 20,
-        "learning": True,
+        "learning": False,
         "max_steps": 200,
         "diffusion_rate": 0.5,
         "pheromone_evaporation": 0.1,
-        "testing": False,
+        "testing": True,
         "render_pheromone": False,
         "max_weight": 5,
         "q_table_file": None,  # Sarà impostato automaticamente
@@ -339,7 +339,7 @@ if __name__ == "__main__":
         "alpha": 0.1,
         "gamma": 0.99,
         "epsilon": 0.5,
-        "epsilon_decay": 0.9988,#0.9711,#0.9941,#0.9985,
+        "epsilon_decay": 0.9988,#0.9424,#0.9988,#0.9711,#0.9941,#0.9985,
         "min_epsilon": 0.01
     }
 
