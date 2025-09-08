@@ -184,6 +184,7 @@ class Robot(Agent):
         self.picked_package = False
         self.use_learning = self.model.learning
         self.shared_reward = 0
+        self.consecutive_releases = 0
 
 
     def get_best_step(self, possible_steps, pheromones, action=None):
@@ -373,8 +374,8 @@ class Robot(Agent):
 
         # --- Pickup package ---
         if self.picked_package:
+            #reward += (self.model.max_steps - self.model.steps) / self.model.max_steps * (10 * self.last_weight_picked)
             reward += 10 * self.last_weight_picked
-
             #print("+ picked package: ", reward)
             self.last_weight_picked = 0
             self.picked_package = False
@@ -402,7 +403,7 @@ class Robot(Agent):
             #print("Package_pheromone: ", package_pheromone)
             reward += package_pheromone
 
-            robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 2
+            robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 5
             #print("Robot_pheromone: ", robot_pheromone)
             reward += robot_pheromone
             self.moved = False
@@ -432,6 +433,7 @@ class Robot(Agent):
                     self.first_reach = True
                     self.enable_first_reach = False
                 if isinstance(obj, Package) and not obj.collected and obj.check_robot_nearby() >= obj.weight:
+                    self.picked_package = True
                     #print("Pacco raccolto con peso: ", obj.weight)
 
                     #devo controllare i robot adiacenti al pacco e darli reward
@@ -442,7 +444,8 @@ class Robot(Agent):
                         cell_contents = self.model.grid.get_cell_list_contents([cell])
                         for r in cell_contents:
                             if isinstance(r, Robot) and r is not self:
-                                r.shared_reward += (10 * obj.weight) #reward per aver aiutato
+                                #r.shared_reward += (self.model.max_steps - self.model.steps) / self.model.max_steps * (10 * self.last_weight_picked) #reward per aver aiutato
+                                r.shared_reward += 10 * self.last_weight_picked
 
 
                     self.carrying_package = obj
@@ -456,6 +459,7 @@ class Robot(Agent):
                     self.model.grid.remove_agent(obj)
 
                     self.last_package_distance = self.model.get_closest_package_distance(self.pos)
+
                     return True
                     #obj.collected = True
                     #obj.delivered = True
@@ -564,9 +568,12 @@ class Robot(Agent):
         #        self.model.grid.move_agent(self, self.random.choice(best_steps))
 
         if action == 2: #se rilascio feromoni non mi muovo
-            self.update_pheromone()
+            self.consecutive_releases += 1
+            for i in range(self.consecutive_releases):
+                self.update_pheromone()
             self.released_pheromone = True
         else:
+            self.consecutive_releases = 0
             self.moved = True
             best_steps = self.get_best_step(possible_steps, pheromones, action)
             if best_steps:
@@ -638,7 +645,7 @@ class Package(Agent):
         self.collected = False
         self.delivered = False
         self.destination = self.assign_random_destination()
-        self.weight = self.random.randint(2, self.model.max_weight)
+        self.weight = self.random.randint(1, self.model.max_weight)
 
     def assign_random_destination(self):
         while True:

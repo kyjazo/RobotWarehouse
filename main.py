@@ -324,11 +324,11 @@ if __name__ == "__main__":
         "height": 20,
         "num_robot": 10,
         "num_package": 20,
-        "learning": False,
+        "learning": True,
         "max_steps": 200,
         "diffusion_rate": 0.5,
         "pheromone_evaporation": 0.1,
-        "testing": True,
+        "testing": False,
         "render_pheromone": False,
         "max_weight": 5,
         "q_table_file": None,  # Sarà impostato automaticamente

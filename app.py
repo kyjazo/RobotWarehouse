@@ -3,7 +3,7 @@ from mesa.visualization import SolaraViz, make_space_component, Slider
 from model import WarehouseModel
 from agents import Robot, Package, Obstacle, Pheromones, QLearning
 
-treshold = 0.0001
+treshold = 0.01
 
 def agent_portrayal(agent):
     portrayal = {
