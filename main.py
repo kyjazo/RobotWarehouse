@@ -226,6 +226,76 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
     plt.show()
 
 
+
+def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", save=False):
+    """
+    Plot delle azioni utilizzate ad ogni step in un episodio specifico.
+    Mostra la media e deviazione standard attraverso tutte le run.
+    I dati sono differenziati per step (non cumulativi).
+
+    Asse x: Step della simulazione
+    Asse y: Numero di azioni utilizzate in quello step
+    """
+    # Filtra i dati per l'episodio specificato
+    episode_data = df[df['iteration'] == episode_id].copy()
+    print(episode_data)
+    if episode_data.empty:
+        print(f"⚠️ Nessun dato trovato per episodio {episode_id}")
+        return
+
+    action_columns = ["Action_0", "Action_1", "Action_2", "Action_3"]
+    action_labels = ["Follow package pheromone", "Follow robot pheromone", "Deposit pheromone", "Random movement"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
+    markers = ['o', 's', '^', 'D']
+
+    max_steps = int(episode_data['Step'].max())
+    all_runs_data = []
+
+    for run in episode_data['run_id'].unique():
+        run_data = episode_data[episode_data['run_id'] == run].copy()
+        run_steps = run_data.groupby('Step')[action_columns].sum().reset_index()
+
+        # Differenze per step (non cumulativo)
+        run_steps_diff = run_steps.copy()
+        run_steps_diff[action_columns] = run_steps[action_columns].diff().fillna(run_steps[action_columns].iloc[0])
+
+        steps_range = pd.DataFrame({'Step': range(max_steps + 1)})
+        steps_data = steps_range.merge(run_steps_diff, on='Step', how='left').fillna(0)
+        all_runs_data.append(steps_data)
+
+    if all_runs_data:
+        combined_data = pd.concat(all_runs_data)
+        mean_data = combined_data.groupby('Step')[action_columns].mean().reset_index()
+        std_data = combined_data.groupby('Step')[action_columns].std().reset_index()
+
+        plt.figure(figsize=(14, 7))
+        plt.style.use('seaborn-v0_8')
+
+        for action, label, color, marker in zip(action_columns, action_labels, colors, markers):
+            plt.plot(mean_data['Step'], mean_data[action],
+                     label=label, linewidth=2.5, color=color, alpha=0.9, marker=marker, markersize=5)
+            plt.fill_between(mean_data['Step'],
+                             mean_data[action] - std_data[action],
+                             mean_data[action] + std_data[action],
+                             color=color, alpha=0.25)
+
+        global_y_max = combined_data[action_columns].max().max() * 1.1
+        plt.ylim(0, global_y_max * 1.5)
+
+        plt.title(f'Actions per Step in single Episode ', fontsize=16, fontweight='bold')
+        plt.xlabel('Step', fontsize=14)
+        plt.ylabel('Number of Actions', fontsize=14)
+        plt.legend(title="Actions", title_fontsize=12, fontsize=10,
+                   frameon=True, shadow=True, facecolor='white', edgecolor='gray', loc='upper right')
+        plt.grid(True, linestyle='--', alpha=0.5)
+        plt.tight_layout()
+
+        if save:
+            os.makedirs(output_dir, exist_ok=True)
+            filename = f"actions_per_step_episode_{episode_id}.png"
+            plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
+        plt.show()
+
 def run_single_simulation(run_id, base_params, q_learning_params, num_episodes= 5000):
     try:
         params = base_params.copy()
@@ -339,7 +409,7 @@ if __name__ == "__main__":
         "alpha": 0.1,
         "gamma": 0.99,
         "epsilon": 0.5,
-        "epsilon_decay": 0.9988,#0.9424,#0.9988,#0.9711,#0.9941,#0.9985,
+        "epsilon_decay": 0.9985,#0.9424,#0.9988,#0.9711,#0.9941,#0.9985,
         "min_epsilon": 0.01
     }
 
@@ -392,6 +462,7 @@ if __name__ == "__main__":
         if save:
             save_simulation_metadata(base_params, q_learning_params, output_dir=output_dir)
 
+        #plot_actions_per_step(df, save = save)
 
         window_size = 100
         plot_reward(df, output_dir=output_dir, window_size=window_size)

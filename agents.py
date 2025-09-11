@@ -240,104 +240,6 @@ class Robot(Agent):
             return [self.random.choice(possible_steps)]
 
 
-    #def calculate_reward(self):
-#
-    #    base_reward = 0
-    #    #print("Parto con reward 0: ", base_reward)
-    #    #base_reward -= 1 #penalità fissa
-    #    #print("shared reward: ", self.shared_reward)
-    #    base_reward += self.shared_reward
-    #    #print("aggiungo lo shared reward e diventa: ", base_reward)
-    #    self.shared_reward = 0
-#
-    #    if self.first_reach:
-    #        possible_steps = self.model.grid.get_neighborhood(
-    #            self.pos, moore=True, include_center=False, radius=1)
-#
-    #        for step in possible_steps:
-    #            cell_contents = self.model.grid.get_cell_list_contents([step])
-    #            for obj in cell_contents:
-    #                if isinstance(obj, Package) and not obj.collected:
-    #                    base_reward += 5 #prendi reward quando raggiungi un package, ma solo la prima volta
-    #                    #print("Reward per aver raggiunto un package")
-    #                    #print("aggiungo il reward per aver raggiunto il package e diventa: ", base_reward)
-    #                    self.first_reach = False
-#
-    #    #if self.previous_pos == self.pos:
-    #    #    #print("Penalità per essere rimasto fermo")
-    #    #    base_reward -= 2
-    #    #    #print("Penalità per essere rimasto fermo e diventa: ", base_reward)
-#
-    #    if self.released_pheromone: #se rilascio feromoni senza package vicino ho penalità e viceversa
-    #        self.released_pheromone = False
-    #        valid_release = False
-    #        possible_steps = self.model.grid.get_neighborhood(
-    #            self.pos, moore=True, include_center=False, radius=1)
-#
-    #        for step in possible_steps:
-    #            cell_contents = self.model.grid.get_cell_list_contents([step])
-    #            for obj in cell_contents:
-    #                if isinstance(obj, Package) and not obj.collected:
-    #                    valid_release = True
-#
-    #        if valid_release:
-    #            base_reward += 2
-    #            #print("hai fatto un rilascio giusto: ", base_reward)
-    #        else:
-    #            base_reward -= 3
-    #            #print("rilascio sbagliato: ", base_reward)
-#
-#
-#
-    #    if self.picked_package:
-    #        #più un package era pesante maggiore è la reward
-    #        #print("ho raccolto un package con peso:", self.last_weight_picked)
-#
-    #        base_reward += (10.0 * self.last_weight_picked)
-    #        #print("reward per aver raccolto un package sommato: ", base_reward)
-    #        self.last_weight_picked = 0
-#
-#
-    #        self.last_package_distance = self.model.get_closest_package_distance(self.pos)
-    #        #self.last_goal_distance = self.model.get_distance(self.pos, self.target_location)
-    #        self.picked_package = False
-    #        #print("reward per aver raccolto un pacco", base_reward)
-    #        #return base_reward
-#
-#
-    #    current_dist_package= self.model.get_closest_package_distance(self.pos)
-    #    package_distance_reward = 0
-    #    if hasattr(self, 'last_package_distance') and self.model.steps > 0:
-    #        dist_change_package = self.last_package_distance - current_dist_package
-    #        ##print("dist_change_package: ", dist_change_package)
-    #        package_distance_reward = dist_change_package * 2
-    #        #print("Reward per avvicinamento package: ", distance_reward)
-#
-    #    self.last_package_distance = current_dist_package
-#
-    #    current_dist_robot = self.model.get_closest_robot_distance(self.pos)
-#
-    #    #print("last_dist_robot", self.last_robot_distance)
-    #    #print("current_dist_robot", current_dist_robot)
-    #    # print("Last distance: ", self.last_package_distance)
-    #    # print("Current distance: ", current_dist)
-    #    robot_distance_reward = 0
-    #    if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
-    #        dist_change_robot = self.last_robot_distance - current_dist_robot
-    #        #print("dist_change_robot: ", dist_change_robot)
-    #        robot_distance_reward = dist_change_robot
-#
-    #    self.last_robot_distance = current_dist_robot
-#
-    #    if self.moved:
-    #        #print("package_distance_reward: ", package_distance_reward)
-    #        #print("robot_distance_reward: ", package_distance_reward)
-    #        base_reward += max(package_distance_reward, robot_distance_reward)
-    #        #print("reward dopo che ho aggiunto la distanza migliore: ", base_reward)
-#
-    #    #print("Reward per pass: ", base_reward)
-    #    #print("reward finale: ", base_reward)
-    #    return base_reward
     def calculate_reward(self):
         reward = 0
         #print("reward iniziale: ", reward)
@@ -356,21 +258,21 @@ class Robot(Agent):
                         self.first_reach = False
                         #print("+ first reach: ", reward)
 
-        # --- Rilascio feromone ---
-        if self.released_pheromone:
-            self.released_pheromone = False
-            valid_release = False
-            neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
-            for step in neighborhood:
-                for obj in self.model.grid.get_cell_list_contents([step]):
-                    if isinstance(obj, Package) and not obj.collected:
-                        valid_release = True
-            if valid_release:
-                reward += 2  # premio se vicino a un pacco
-                #print("+ valid release: ", reward)
-            else:
-                reward -= 5  # penalità se spammi feromone a caso
-                #print("+ invalid release: ", reward)
+        ## --- Rilascio feromone ---
+        #if self.released_pheromone:
+        #    self.released_pheromone = False
+        #    valid_release = False
+        #    neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
+        #    for step in neighborhood:
+        #        for obj in self.model.grid.get_cell_list_contents([step]):
+        #            if isinstance(obj, Package) and not obj.collected:
+        #                valid_release = True
+        #    if valid_release:
+        #        reward += 2  # premio se vicino a un pacco
+        #        #print("+ valid release: ", reward)
+        #    else:
+        #        reward -= 5  # penalità se spammi feromone a caso
+        #        #print("+ invalid release: ", reward)
 
         # --- Pickup package ---
         if self.picked_package:
@@ -381,37 +283,38 @@ class Robot(Agent):
             self.picked_package = False
             self.enable_first_reach = True
 
-        ## --- Shaping: distanza da package più vicino ---
-        #current_dist = self.model.get_closest_package_distance(self.pos)
-        #if hasattr(self, 'last_package_distance') and self.model.steps > 0:
-        #    dist_change = self.last_package_distance - current_dist
-        #    reward += dist_change * 0.5  # piccolo shaping
-        #    #print("+ avvicinamento package: ", reward)
-        #self.last_package_distance = current_dist
+        # --- Shaping: distanza da package più vicino ---
+        current_dist = self.model.get_closest_package_distance(self.pos)
+        if hasattr(self, 'last_package_distance') and self.model.steps > 1:
+            dist_change = self.last_package_distance - current_dist
+            reward += dist_change * 1
+            #print("+ avvicinamento package: ", dist_change)
+        self.last_package_distance = current_dist
 #
-        ## --- Shaping: distanza da robot (utile per coordinarsi) ---
-        #current_robot_dist = self.model.get_closest_robot_distance(self.pos)
-        #if hasattr(self, 'last_robot_distance') and self.model.steps > 0:
-        #    dist_change_robot = self.last_robot_distance - current_robot_dist
-        #    reward += dist_change_robot * 1
-        #    #print("+avvicinamento robot: ", reward)
-        #self.last_robot_distance = current_robot_dist
+        # --- Shaping: distanza da robot (utile per coordinarsi) ---
+        current_robot_dist = self.model.get_closest_robot_distance(self.pos, robot=self)
+        #print("current_robot_distance: ", current_robot_dist)
+        if hasattr(self, 'last_robot_distance') and self.model.steps > 1:
+            dist_change_robot = self.last_robot_distance - current_robot_dist
+            reward += dist_change_robot * 1
+            #print("+avvicinamento robot: ", dist_change_robot)
+        self.last_robot_distance = current_robot_dist
 
-        (x, y) = self.pos
-        if self.model.steps > 0 and self.moved:
-            package_pheromone = self.model.package_pheromone_layer.data[x, y]
-            #print("Package_pheromone: ", package_pheromone)
-            reward += package_pheromone
-
-            robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 5
-            #print("Robot_pheromone: ", robot_pheromone)
-            reward += robot_pheromone
-            self.moved = False
+        #(x, y) = self.pos
+        #if self.model.steps > 0 and self.moved:
+        #    package_pheromone = self.model.package_pheromone_layer.data[x, y]
+        #    #print("Package_pheromone: ", package_pheromone)
+        #    reward += package_pheromone
+#
+        #    robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 5
+        #    #print("Robot_pheromone: ", robot_pheromone)
+        #    reward += robot_pheromone
+        #    self.moved = False
 
 
 
         # --- Costo energetico per step ---
-        reward -= 1
+        #reward -= 0.5
         #print("reward finale: ", reward)
         return reward
 
@@ -481,7 +384,9 @@ class Robot(Agent):
         #il rilascio e il raccoglimento di un package non conta come mossa dello step, possono muoversi dopo
         if(self.model.steps >= 1):
             self.last_package_distance = self.model.get_closest_package_distance(self.pos)
-            self.last_robot_distance = self.model.get_closest_robot_distance(self.pos)
+
+            #self.last_robot_distance = self.model.get_closest_robot_distance(self.pos)
+            #print("Last_robot_distance: ", self.last_robot_distance)
             #self.last_goal_distance = self.model.get_distance(self.pos, self.target_location)
             #print("Aggiornate le distanze")
 
@@ -645,7 +550,7 @@ class Package(Agent):
         self.collected = False
         self.delivered = False
         self.destination = self.assign_random_destination()
-        self.weight = self.random.randint(1, self.model.max_weight)
+        self.weight = self.random.randint(2, self.model.max_weight)
 
     def assign_random_destination(self):
         while True:

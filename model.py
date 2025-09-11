@@ -341,7 +341,7 @@ class WarehouseModel(Model):
                     return False
         return True
 
-    def get_closest_package_distance(self, pos, radius=5):
+    def get_closest_package_distance(self, pos, radius=20):
 
         neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
         package = [agent for agent in neighbors if isinstance(agent, Package) and not agent.collected]
@@ -350,10 +350,10 @@ class WarehouseModel(Model):
             return radius + 1
 
         return min(self.get_distance(pos, s.pos) for s in package)
-    def get_closest_robot_distance(self, pos, radius=5):
+    def get_closest_robot_distance(self, pos, robot = None, radius=20):
 
-        neighbors = self.grid.get_neighbors(pos, moore=True, include_center=False, radius=radius)
-        robot = [agent for agent in neighbors if isinstance(agent, Robot)]
+        neighbors = self.grid.get_neighbors(pos, moore=True, include_center=True, radius=radius)
+        robot = [agent for agent in neighbors if isinstance(agent, Robot) and agent is not robot]
 
         if not robot:
             return radius + 1
@@ -428,6 +428,8 @@ class WarehouseModel(Model):
             self.evaporate_pheromones()
             self.diffuse_pheromones()
 
+            ###per la visualizzazione delle azioni in un singolo episodio
+            #self.datacollector.collect(self)
 
 
 
