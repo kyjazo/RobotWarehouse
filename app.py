@@ -105,7 +105,8 @@ model_params = {
     "pheromone_evaporation": Slider("Pheromone Evaporation", 0.1, 0, 1, 0.01, dtype=float),
     "pheromone_added": Slider("Pheromone Released", 1, 0, 10, 0.1, dtype=float),
     "diffusion_rate": Slider("Diffusion Rate", 0.5, 0.01, 1, 0.1, dtype=float),
-    "max_weight": Slider("Max Weight", 3, 2, 10, 1, dtype=float),
+    "max_weight": Slider("Max Weight", 5, 2, 10, 1, dtype=int),
+    "min_weight": Slider("Min Weight", 2, 2, 10, 1, dtype=int),
     "q_learning": q
 
 }

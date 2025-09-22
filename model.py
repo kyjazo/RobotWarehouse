@@ -16,12 +16,13 @@ class WarehouseModel(Model):
                  num_package=config["num_package"], num_obstacle=config["num_obstacle"], pheromone_evaporation=config["pheromone_evaporation"],
                  pheromone_added=config["pheromone_added"], diffusion_rate=config["diffusion_rate"],
                  treshold=config["treshold"], render_pheromone=False, seed=None, learning=True, q_learning=None, q_table_file="q_table_avg.json",
-                 max_steps=config["max_steps"], testing=False, max_weight=config["max_weight"]
+                 max_steps=config["max_steps"], testing=False, max_weight=config["max_weight"], min_weight=config["min_weight"]
 
                  ):
 
         super().__init__(seed=seed)
 
+        self.min_weight = min_weight
         self.max_weight = max_weight
         self.max_steps = max_steps
         self.testing = testing

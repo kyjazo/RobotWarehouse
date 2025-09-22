@@ -7,8 +7,9 @@
   "pheromone_added": 1,
   "pheromone_evaporation": 0.1,
   "diffusion_rate": 0.5,
-  "treshold": 0.01,
+  "treshold": 0.001,
   "max_steps": 200,
-  "max_weight": 5
+  "max_weight": 5,
+  "min_weight": 2
 
 }

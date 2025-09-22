@@ -226,27 +226,28 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
     plt.show()
 
 
-
-def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", save=False):
+def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", save=False, window_size=5):
     """
     Plot delle azioni utilizzate ad ogni step in un episodio specifico.
     Mostra la media e deviazione standard attraverso tutte le run.
-    I dati sono differenziati per step (non cumulativi).
+    Applica una media mobile per smussare i dati.
+    Esclude l'azione "Random movement" (Action_3).
 
     Asse x: Step della simulazione
     Asse y: Numero di azioni utilizzate in quello step
     """
     # Filtra i dati per l'episodio specificato
     episode_data = df[df['iteration'] == episode_id].copy()
-    print(episode_data)
+
     if episode_data.empty:
         print(f"⚠️ Nessun dato trovato per episodio {episode_id}")
         return
 
-    action_columns = ["Action_0", "Action_1", "Action_2", "Action_3"]
-    action_labels = ["Follow package pheromone", "Follow robot pheromone", "Deposit pheromone", "Random movement"]
-    colors = ["#1f77b4", "#ff7f0e", "#2ca02c", "#d62728"]
-    markers = ['o', 's', '^', 'D']
+    # Escludi Action_3 (Random movement)
+    action_columns = ["Action_0", "Action_1", "Action_2"]
+    action_labels = ["Follow package pheromone", "Follow robot pheromone", "Deposit pheromone"]
+    colors = ["#1f77b4", "#ff7f0e", "#2ca02c"]
+    markers = ['o', 's', '^']
 
     max_steps = int(episode_data['Step'].max())
     all_runs_data = []
@@ -268,21 +269,25 @@ def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", sav
         mean_data = combined_data.groupby('Step')[action_columns].mean().reset_index()
         std_data = combined_data.groupby('Step')[action_columns].std().reset_index()
 
+        # Applica media mobile
+        for action in action_columns:
+            mean_data[f'{action}_rolling'] = mean_data[action].rolling(window=window_size, min_periods=1).mean()
+            std_data[f'{action}_rolling'] = std_data[action].rolling(window=window_size, min_periods=1).mean()
+
         plt.figure(figsize=(14, 7))
         plt.style.use('seaborn-v0_8')
 
-        for action, label, color, marker in zip(action_columns, action_labels, colors, markers):
-            plt.plot(mean_data['Step'], mean_data[action],
-                     label=label, linewidth=2.5, color=color, alpha=0.9, marker=marker, markersize=5)
+        for action, label, color in zip(action_columns, action_labels, colors):
+            plt.plot(mean_data['Step'], mean_data[f'{action}_rolling'],
+                     label=label, linewidth=2.5, color=color, alpha=0.9)
+
             plt.fill_between(mean_data['Step'],
-                             mean_data[action] - std_data[action],
-                             mean_data[action] + std_data[action],
+                             mean_data[f'{action}_rolling'] - std_data[f'{action}_rolling'],
+                             mean_data[f'{action}_rolling'] + std_data[f'{action}_rolling'],
                              color=color, alpha=0.25)
 
-        global_y_max = combined_data[action_columns].max().max() * 1.1
-        plt.ylim(0, global_y_max * 1.5)
-
-        plt.title(f'Actions per Step in single Episode ', fontsize=16, fontweight='bold')
+        plt.title(f'Actions per Step in an Episode (rolling mean {window_size})', fontsize=16,
+                  fontweight='bold')
         plt.xlabel('Step', fontsize=14)
         plt.ylabel('Number of Actions', fontsize=14)
         plt.legend(title="Actions", title_fontsize=12, fontsize=10,
@@ -292,7 +297,7 @@ def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", sav
 
         if save:
             os.makedirs(output_dir, exist_ok=True)
-            filename = f"actions_per_step_episode_{episode_id}.png"
+            filename = f"actions_per_step_episode_rolling{window_size}.png"
             plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
@@ -401,6 +406,7 @@ if __name__ == "__main__":
         "testing": False,
         "render_pheromone": False,
         "max_weight": 5,
+        "min_weight": 2,
         "q_table_file": None,  # Sarà impostato automaticamente
     }
 
@@ -462,7 +468,7 @@ if __name__ == "__main__":
         if save:
             save_simulation_metadata(base_params, q_learning_params, output_dir=output_dir)
 
-        #plot_actions_per_step(df, save = save)
+        #plot_actions_per_step(df, save=save, window_size=20)
 
         window_size = 100
         plot_reward(df, output_dir=output_dir, window_size=window_size)

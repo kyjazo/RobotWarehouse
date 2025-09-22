@@ -243,12 +243,22 @@ class Robot(Agent):
     def calculate_reward(self):
         reward = 0
         #print("reward iniziale: ", reward)
-        # --- Shared reward dagli altri robot (aiuto su pacchi pesanti) ---
+
         reward += self.shared_reward
         self.shared_reward = 0
         #print("+shared reward : ", reward)
 
-        # --- Raggiunto package (prima volta) ---
+
+        #x, y = self.pos
+        #robot_ph = self.model.robot_pheromone_layer.data[x, y]
+        #package_ph = self.model.package_pheromone_layer.data[x, y]
+        #threshold = self.model.pheromone_treshold * 10
+#
+        #if robot_ph >= threshold and package_ph >= threshold:
+        #    reward += 0.3
+        #    # print("+ mixed pheromone area: ", reward)
+
+
         if self.first_reach:
             neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
             for step in neighborhood:
@@ -258,23 +268,25 @@ class Robot(Agent):
                         self.first_reach = False
                         #print("+ first reach: ", reward)
 
-        ## --- Rilascio feromone ---
-        #if self.released_pheromone:
-        #    self.released_pheromone = False
-        #    valid_release = False
-        #    neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
-        #    for step in neighborhood:
-        #        for obj in self.model.grid.get_cell_list_contents([step]):
-        #            if isinstance(obj, Package) and not obj.collected:
-        #                valid_release = True
-        #    if valid_release:
-        #        reward += 2  # premio se vicino a un pacco
-        #        #print("+ valid release: ", reward)
-        #    else:
-        #        reward -= 5  # penalità se spammi feromone a caso
-        #        #print("+ invalid release: ", reward)
 
-        # --- Pickup package ---
+        if self.released_pheromone:
+           self.released_pheromone = False
+           valid_release = False
+           neighborhood = self.model.grid.get_neighborhood(self.pos, moore=False, include_center=False, radius=1)
+           for step in neighborhood:
+               for obj in self.model.grid.get_cell_list_contents([step]):
+                   if isinstance(obj, Package) and not obj.collected:
+                       valid_release = True
+           if valid_release:
+               reward += 1
+               #print("+ valid release: ", reward)
+           else:
+               reward -= 2
+               #print("+ invalid release: ", reward)
+#
+
+
+
         if self.picked_package:
             #reward += (self.model.max_steps - self.model.steps) / self.model.max_steps * (10 * self.last_weight_picked)
             reward += 10 * self.last_weight_picked
@@ -283,7 +295,7 @@ class Robot(Agent):
             self.picked_package = False
             self.enable_first_reach = True
 
-        # --- Shaping: distanza da package più vicino ---
+
         current_dist = self.model.get_closest_package_distance(self.pos)
         if hasattr(self, 'last_package_distance') and self.model.steps > 1:
             dist_change = self.last_package_distance - current_dist
@@ -291,7 +303,7 @@ class Robot(Agent):
             #print("+ avvicinamento package: ", dist_change)
         self.last_package_distance = current_dist
 #
-        # --- Shaping: distanza da robot (utile per coordinarsi) ---
+
         current_robot_dist = self.model.get_closest_robot_distance(self.pos, robot=self)
         #print("current_robot_distance: ", current_robot_dist)
         if hasattr(self, 'last_robot_distance') and self.model.steps > 1:
@@ -300,20 +312,7 @@ class Robot(Agent):
             #print("+avvicinamento robot: ", dist_change_robot)
         self.last_robot_distance = current_robot_dist
 
-        #(x, y) = self.pos
-        #if self.model.steps > 0 and self.moved:
-        #    package_pheromone = self.model.package_pheromone_layer.data[x, y]
-        #    #print("Package_pheromone: ", package_pheromone)
-        #    reward += package_pheromone
-#
-        #    robot_pheromone = self.model.robot_pheromone_layer.data[x, y] * 5
-        #    #print("Robot_pheromone: ", robot_pheromone)
-        #    reward += robot_pheromone
-        #    self.moved = False
 
-
-
-        # --- Costo energetico per step ---
         #reward -= 0.5
         #print("reward finale: ", reward)
         return reward
@@ -379,6 +378,42 @@ class Robot(Agent):
         self.target_location = None
         self.package_delivered += 1
 
+    def get_filtered_pheromone(self, x, y):
+
+        raw_value = self.model.robot_pheromone_layer.data[x, y]
+
+        if not self.released_pheromone:
+            return raw_value
+
+        total_release = self.consecutive_releases * self.model.pheromone_added
+        own_contribution = 0.0
+
+        cx, cy = self.pos
+        directions = [(0, 1), (1, 0), (0, -1), (-1, 0),
+                      (1, 1), (1, -1), (-1, 1), (-1, -1)]
+        fraction_per_direction = self.model.diffusion_rate / len(directions)
+
+
+        if (x, y) == (cx, cy):
+
+            diffused_total = 0.0
+            for dx, dy in directions:
+                nx, ny = cx + dx, cy + dy
+                if 0 <= nx < self.model.grid.width and 0 <= ny < self.model.grid.height:
+                    diffused_total += total_release * fraction_per_direction
+
+            own_contribution = (total_release - diffused_total) * (1 - self.model.pheromone_evaporation)
+
+
+        else:
+            for dx, dy in directions:
+                nx, ny = cx + dx, cy + dy
+                if (nx, ny) == (x, y) and 0 <= nx < self.model.grid.width and 0 <= ny < self.model.grid.height:
+                    received = total_release * fraction_per_direction
+                    own_contribution = received * (1 - self.model.pheromone_evaporation)
+                    break
+
+        return max(0.0, raw_value - own_contribution)
 
     def step(self):
         #il rilascio e il raccoglimento di un package non conta come mossa dello step, possono muoversi dopo
@@ -415,7 +450,7 @@ class Robot(Agent):
 
         pheromones = [
             Pheromone(
-                robot_pheromone=self.model.robot_pheromone_layer.data[x, y],
+                robot_pheromone=self.get_filtered_pheromone(x, y), #self.model.robot_pheromone_layer.data[x, y],
                 package_pheromone=self.model.package_pheromone_layer.data[x, y]
             ) for (x, y) in possible_steps
         ] if not self.model.render_pheromone else [
@@ -550,7 +585,7 @@ class Package(Agent):
         self.collected = False
         self.delivered = False
         self.destination = self.assign_random_destination()
-        self.weight = self.random.randint(2, self.model.max_weight)
+        self.weight = self.random.randint(self.model.min_weight, self.model.max_weight)
 
     def assign_random_destination(self):
         while True:
