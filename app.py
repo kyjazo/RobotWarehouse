@@ -7,7 +7,7 @@ treshold = 0.01
 
 def agent_portrayal(agent):
     portrayal = {
-        "size": 120,
+        "size": 100,
     }
 
     if isinstance(agent, Robot):

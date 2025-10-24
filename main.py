@@ -227,15 +227,6 @@ def plot_packages_delivered(df, output_dir="./results", window_size=100):
 
 
 def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", save=False, window_size=5):
-    """
-    Plot delle azioni utilizzate ad ogni step in un episodio specifico.
-    Mostra la media e deviazione standard attraverso tutte le run.
-    Applica una media mobile per smussare i dati.
-    Esclude l'azione "Random movement" (Action_3).
-
-    Asse x: Step della simulazione
-    Asse y: Numero di azioni utilizzate in quello step
-    """
     # Filtra i dati per l'episodio specificato
     episode_data = df[df['iteration'] == episode_id].copy()
 
@@ -301,7 +292,7 @@ def plot_actions_per_step(df, episode_id=0, output_dir="./results_per_step", sav
             plt.savefig(os.path.join(output_dir, filename), dpi=300, bbox_inches='tight')
         plt.show()
 
-def run_single_simulation(run_id, base_params, q_learning_params, num_episodes= 5000):
+def run_single_simulation(run_id, base_params, q_learning_params, num_episodes= 100):
     try:
         params = base_params.copy()
         run_output_dir = None
@@ -380,9 +371,7 @@ def merge_q_tables(run_dirs, output_dir, n_robots):
 
 
 def clean_up_q_tables(run_dirs):
-    """
-    Rimuove le cartelle temporanee delle run dopo aver unito le Q-tables
-    """
+
     for run_dir in run_dirs:
         if os.path.exists(run_dir):
             shutil.rmtree(run_dir)
@@ -392,18 +381,18 @@ def clean_up_q_tables(run_dirs):
 if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
-    num_parallel_runs = 3  # Numero di run parallele
+    num_parallel_runs = 6  # Numero di run parallele
 
     base_params = {
-        "width": 20,
-        "height": 20,
+        "width": 45,
+        "height": 45,
         "num_robot": 10,
         "num_package": 20,
-        "learning": True,
+        "learning": False,
         "max_steps": 200,
         "diffusion_rate": 0.5,
         "pheromone_evaporation": 0.1,
-        "testing": False,
+        "testing": True,
         "render_pheromone": False,
         "max_weight": 5,
         "min_weight": 2,
@@ -415,7 +404,7 @@ if __name__ == "__main__":
         "alpha": 0.1,
         "gamma": 0.99,
         "epsilon": 0.5,
-        "epsilon_decay": 0.9985,#0.9424,#0.9988,#0.9711,#0.9941,#0.9985,
+        "epsilon_decay": 0.9941,#0.9424,#0.9988,#0.9711,#0.9941,#0.9985,
         "min_epsilon": 0.01
     }
 
@@ -470,7 +459,7 @@ if __name__ == "__main__":
 
         #plot_actions_per_step(df, save=save, window_size=20)
 
-        window_size = 100
+        window_size = 25
         plot_reward(df, output_dir=output_dir, window_size=window_size)
         plot_packages_delivered(df, output_dir=output_dir, window_size=window_size)
         plot_simulation_steps(df, output_dir=output_dir, window_size=window_size)
